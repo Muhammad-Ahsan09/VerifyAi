@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LayoutDashboard, ShieldAlert, Image as ImageIcon, Search, FileText } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
@@ -29,6 +30,9 @@ export default function Sidebar() {
               </Link>
             ))}
           </nav>
+        </div>
+        <div className="mt-auto px-4 py-4 border-t border-border/40">
+          <ThemeToggle />
         </div>
       </div>
     </aside>

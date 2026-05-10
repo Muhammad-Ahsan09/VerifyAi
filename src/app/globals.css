@@ -62,48 +62,48 @@
 }
 
 :root {
-  /* Dark Graphite Theme by default */
-  --background: #09090b; /* Very dark graphite */
-  --foreground: #fafafa;
+  /* Light Theme */
+  --background: #ffffff;
+  --foreground: #09090b;
   
-  --card: rgba(255, 255, 255, 0.02);
-  --card-foreground: #fafafa;
+  --card: #ffffff;
+  --card-foreground: #09090b;
   
-  --popover: #09090b;
-  --popover-foreground: #fafafa;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
   
-  --primary: #3b82f6; /* Elegant blue */
+  --primary: #3b82f6;
   --primary-foreground: #ffffff;
   
-  --secondary: #1e293b; /* Deep navy */
-  --secondary-foreground: #fafafa;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
   
-  --muted: rgba(255, 255, 255, 0.05);
-  --muted-foreground: #a1a1aa;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
   
-  --accent: rgba(255, 255, 255, 0.05);
-  --accent-foreground: #fafafa;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
   
-  --destructive: #ef4444; /* Muted red */
+  --destructive: #ef4444;
   
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.08);
+  --border: #e2e8f0;
+  --input: #e2e8f0;
   --ring: rgba(59, 130, 246, 0.5);
   
   --radius: 0.75rem;
   
-  --sidebar: #09090b;
-  --sidebar-foreground: #fafafa;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
   --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(255, 255, 255, 0.05);
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
   --sidebar-ring: rgba(59, 130, 246, 0.5);
 }
 
 .dark {
-  /* Ensure dark mode class maps to the same to avoid flashes */
+  /* Dark Graphite Theme */
   --background: #09090b;
   --foreground: #fafafa;
   --card: rgba(255, 255, 255, 0.02);
@@ -137,13 +137,17 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30;
-    /* Soft navy gradient background for the body */
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 transition-colors duration-300;
+  }
+  .dark body {
     background-image: radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.15) 0%, transparent 70%);
     background-attachment: fixed;
   }
 }
 
 .glass-card {
-  @apply bg-card backdrop-blur-xl border border-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-2xl;
+  @apply bg-card backdrop-blur-xl border border-border shadow-[0_8px_32px_rgba(0,0,0,0.06)] rounded-2xl transition-colors duration-300;
+}
+.dark .glass-card {
+  @apply shadow-[0_8px_32px_rgba(0,0,0,0.12)];
 }

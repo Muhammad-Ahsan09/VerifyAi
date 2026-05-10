@@ -23,6 +23,7 @@ const sampleDeepfakes = [
 
 export default function DeepfakeAnalyzer() {
   const [fileState, setFileState] = useState(null); // { name, type }
+  const [fileData, setFileData] = useState(null); // The actual File object
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -39,6 +40,7 @@ export default function DeepfakeAnalyzer() {
     else if (sample.id === "ai-image") { type = "image/jpeg"; ext = ".jpg"; }
     
     setFileState({ name: `sample_${sample.id}${ext}`, type });
+    setFileData(null);
     setDropdownOpen(false);
     setScanResult(null);
     toast.success(`Loaded sample: ${sample.label}`);
@@ -46,6 +48,7 @@ export default function DeepfakeAnalyzer() {
 
   const handleClear = () => {
     setFileState(null);
+    setFileData(null);
     setSampleId(null);
     setScanResult(null);
     toast.info("Cleared media");
@@ -61,14 +64,28 @@ export default function DeepfakeAnalyzer() {
     setScanResult(null);
     
     try {
-      const res = await fetch("/api/deepfake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          fileType: fileState.type, 
-          sampleId: sampleId 
-        })
-      });
+      let res;
+      
+      // If we have an actual file (not a sample), send it as FormData
+      if (fileData) {
+        const formData = new FormData();
+        formData.append("file", fileData);
+        
+        res = await fetch("/api/deepfake", {
+          method: "POST",
+          body: formData
+        });
+      } else {
+        // Fallback for samples
+        res = await fetch("/api/deepfake", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            fileType: fileState.type, 
+            sampleId: sampleId 
+          })
+        });
+      }
       
       if (!res.ok) {
         throw new Error("Failed to analyze media");
@@ -110,6 +127,7 @@ export default function DeepfakeAnalyzer() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setFileState({ name: file.name, type: file.type });
+      setFileData(file);
       setSampleId(null);
       toast.success("Media loaded for analysis");
     }
@@ -192,6 +210,7 @@ export default function DeepfakeAnalyzer() {
                       if (e.target.files && e.target.files[0]) {
                         const file = e.target.files[0];
                         setFileState({ name: file.name, type: file.type });
+                        setFileData(file);
                         setSampleId(null);
                         toast.success("Media loaded");
                       }

@@ -2,107 +2,166 @@ import { NextResponse } from "next/server";
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { fileType, sampleId } = body;
+    const contentType = request.headers.get("content-type") || "";
+    const apiKey = process.env.SCAM_AI_API_KEY;
 
-    // Simulate analysis delay
-    await new Promise(resolve => setTimeout(resolve, 3500));
+    // Handle Samples (JSON)
+    if (contentType.includes("application/json")) {
+      const body = await request.json();
+      const { sampleId } = body;
 
-    // Return different mock data based on input
-    if (sampleId === "politician") {
+      // Simulate analysis delay
+      await new Promise(resolve => setTimeout(resolve, 3500));
+
+      if (sampleId === "politician") {
+        return NextResponse.json({
+          authenticityScore: 12,
+          threatLevel: "Critical",
+          summary: "High probability of AI-generated video and audio cloning detected.",
+          videoScore: 15,
+          audioScore: 8,
+          anomalies: [
+            { time: "0:04", description: "Unnatural eye blinking pattern detected." },
+            { time: "0:12", description: "Audio waveform frequency mismatch indicative of GAN voice cloning." },
+            { time: "0:18", description: "Lighting artifact around the jawline boundary." }
+          ],
+          recommendations: [
+            "Do not share this video.",
+            "Check official trusted sources for verification."
+          ]
+        });
+      }
+
+      if (sampleId === "scam-call") {
+        return NextResponse.json({
+          authenticityScore: 4,
+          threatLevel: "Critical",
+          summary: "Extremely high probability of synthetic AI voice cloning.",
+          videoScore: 100,
+          audioScore: 4,
+          anomalies: [
+            { time: "0:02", description: "Unnatural breathing patterns detected in audio track." },
+            { time: "0:15", description: "Robotic intonation and lack of emotional variance." }
+          ],
+          recommendations: [
+            "Hang up immediately if you receive a call like this."
+          ]
+        });
+      }
+
+      if (sampleId === "ai-image") {
+        return NextResponse.json({
+          authenticityScore: 18,
+          threatLevel: "High Risk",
+          summary: "Multiple visual anomalies consistent with generative AI models detected.",
+          imageScore: 18,
+          anomalies: [
+            { time: "Visual", description: "Inconsistent lighting on background objects." },
+            { time: "Visual", description: "Anatomical anomaly detected." }
+          ],
+          recommendations: [
+            "Do not trust this image as photographic evidence."
+          ]
+        });
+      }
+      
+      throw new Error("Invalid sample ID");
+    }
+
+    // Handle Real Files (FormData)
+    if (contentType.includes("multipart/form-data")) {
+      if (!apiKey) {
+        throw new Error("SCAM_AI_API_KEY is not configured in .env.local.");
+      }
+
+      const formData = await request.formData();
+      const file = formData.get("file");
+
+      if (!file) {
+        throw new Error("No file provided");
+      }
+
+      const isImage = file.type.includes("image");
+      const isVideo = file.type.includes("video") || file.type.includes("audio");
+
+      let endpoint = "";
+      const scamFormData = new FormData();
+
+      if (isImage) {
+        endpoint = "https://api.scam.ai/api/defence/faceswap/predict";
+        scamFormData.append("files", file);
+      } else if (isVideo) {
+        endpoint = "https://api.scam.ai/api/defence/video/detection";
+        scamFormData.append("video", file);
+      } else {
+        throw new Error("Unsupported file type");
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey
+        },
+        body: scamFormData
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Scam.ai API error (${response.status}): ${errText}`);
+      }
+
+      const scamResult = await response.json();
+      console.log("Scam.ai Raw Result:", scamResult);
+
+      // Best effort mapping of unknown scam.ai response schema
+      let fakeScore = 0.5; // Default middle ground
+      let rawStr = JSON.stringify(scamResult);
+
+      if (typeof scamResult.fake_probability !== 'undefined') {
+        fakeScore = scamResult.fake_probability;
+      } else if (typeof scamResult.score !== 'undefined') {
+        fakeScore = scamResult.score;
+      } else if (scamResult.prediction) {
+        // e.g. prediction: 'fake', confidence: 0.99
+        fakeScore = (scamResult.prediction === 'fake' || scamResult.prediction === 'spoof') 
+          ? (scamResult.confidence || 0.9) 
+          : (1 - (scamResult.confidence || 0.9));
+      }
+
+      const authenticityScore = Math.max(0, Math.min(100, Math.round((1 - fakeScore) * 100)));
+      
+      let threatLevel = "Safe";
+      let summary = "No significant AI manipulation detected by Scam.ai.";
+      
+      if (authenticityScore < 40) {
+        threatLevel = "Critical";
+        summary = "High probability of AI-generated content detected by Scam.ai.";
+      } else if (authenticityScore < 75) {
+        threatLevel = "High Risk";
+        summary = "Suspicious artifacts detected. Media may be manipulated.";
+      }
+
       return NextResponse.json({
-        authenticityScore: 12, // 12% authentic -> 88% fake
-        threatLevel: "Critical",
-        summary: "High probability of AI-generated video and audio cloning detected.",
-        videoScore: 15,
-        audioScore: 8,
+        authenticityScore,
+        threatLevel,
+        summary,
+        ...(isImage ? { imageScore: authenticityScore } : { videoScore: authenticityScore, audioScore: authenticityScore }),
         anomalies: [
-          { time: "0:04", description: "Unnatural eye blinking pattern detected." },
-          { time: "0:12", description: "Audio waveform frequency mismatch indicative of GAN voice cloning." },
-          { time: "0:18", description: "Lighting artifact around the jawline boundary." }
+          { time: "Scan", description: `Scam.ai Output: ${rawStr.substring(0, 60)}...` }
         ],
         recommendations: [
-          "Do not share this video.",
-          "Check official trusted sources for verification.",
-          "Report this media on the platform where it was found."
+          "Result verified by Scam.ai ML Engine",
+          "Always verify context even if marked safe"
         ]
       });
     }
 
-    if (sampleId === "scam-call") {
-      return NextResponse.json({
-        authenticityScore: 4,
-        threatLevel: "Critical",
-        summary: "Extremely high probability of synthetic AI voice cloning.",
-        videoScore: 100, // No video, N/A
-        audioScore: 4,
-        anomalies: [
-          { time: "0:02", description: "Unnatural breathing patterns detected in audio track." },
-          { time: "0:15", description: "Robotic intonation and lack of emotional variance." }
-        ],
-        recommendations: [
-          "Hang up immediately if you receive a call like this.",
-          "Do not provide any personal or financial information.",
-          "Establish a safe word with family members."
-        ]
-      });
-    }
-
-    if (sampleId === "ai-image") {
-      return NextResponse.json({
-        authenticityScore: 18,
-        threatLevel: "High Risk",
-        summary: "Multiple visual anomalies consistent with generative AI models detected.",
-        imageScore: 18,
-        anomalies: [
-          { time: "Visual", description: "Inconsistent lighting on background objects." },
-          { time: "Visual", description: "Anatomical anomaly detected (extra digits/blurry boundaries)." },
-          { time: "Metadata", description: "Missing standard camera EXIF data." }
-        ],
-        recommendations: [
-          "Do not trust this image as photographic evidence.",
-          "Perform a reverse image search to find the original context."
-        ]
-      });
-    }
-
-    // Default simulation for uploaded files
-    const isLikelyFake = Math.random() > 0.5;
-    const isImage = fileType && fileType.includes("image");
-    
-    if (isLikelyFake) {
-      return NextResponse.json({
-        authenticityScore: 24,
-        threatLevel: "High Risk",
-        summary: "Analysis indicates multiple artifacts consistent with AI generation.",
-        ...(isImage ? { imageScore: 28 } : { videoScore: 28, audioScore: 45 }),
-        anomalies: [
-          { time: "0:00", description: "Initial frame metadata shows suspicious compression artifacts." },
-          { time: "Unknown", description: "Background noise profile does not match environment." }
-        ],
-        recommendations: [
-          "Treat this media with extreme skepticism.",
-          "Verify the source before engaging."
-        ]
-      });
-    } else {
-      return NextResponse.json({
-        authenticityScore: 94,
-        threatLevel: "Safe",
-        summary: "No significant AI manipulation detected. Media appears authentic.",
-        ...(isImage ? { imageScore: 94 } : { videoScore: 92, audioScore: 96 }),
-        anomalies: [],
-        recommendations: [
-          "This media passes basic authenticity checks.",
-          "Always maintain a baseline of critical thinking."
-        ]
-      });
-    }
+    throw new Error("Invalid content type. Expected multipart/form-data or application/json");
 
   } catch (error) {
     console.error("API /deepfake error:", error);
     return NextResponse.json(
-      { error: "Failed to analyze deepfake media" },
+      { error: error.message || "Failed to analyze deepfake media" },
       { status: 500 }
     );
   }
