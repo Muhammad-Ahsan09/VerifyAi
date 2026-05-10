@@ -2,8 +2,8 @@ import Link from "next/link";
 import { LayoutDashboard, ShieldAlert, Image as ImageIcon, Search, FileText } from "lucide-react";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Overview", href: "/" },
-  { icon: ShieldAlert, label: "Scam Detection", href: "/scam-detection" },
+  { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
+  { icon: ShieldAlert, label: "Threat Scanner", href: "/scanner" },
   { icon: Search, label: "Phishing Checker", href: "/phishing" },
   { icon: ImageIcon, label: "Deepfake Analysis", href: "/deepfake" },
   { icon: FileText, label: "Reports", href: "/reports" },
