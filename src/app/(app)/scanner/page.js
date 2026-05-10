@@ -17,6 +17,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import ThreatCard from "@/components/scanner/ThreatCard";
 
 // --- Sample Scams Data ---
 const sampleScams = [
@@ -338,94 +339,11 @@ export default function ThreatScanner() {
                 </div>
               </motion.div>
             ) : (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-              >
-                <div className={`rounded-2xl border overflow-hidden ${
-                  scanResult.threatLevel === 'Safe' ? 'border-green-500/30 bg-green-500/5' :
-                  scanResult.threatLevel === 'Suspicious' ? 'border-amber-500/30 bg-amber-500/5' :
-                  'border-destructive/30 bg-destructive/5'
-                }`}>
-                  <div className={`px-6 py-4 flex items-center justify-between border-b ${
-                    scanResult.threatLevel === 'Safe' ? 'bg-green-500/10 border-green-500/20' :
-                    scanResult.threatLevel === 'Suspicious' ? 'bg-amber-500/10 border-amber-500/20' :
-                    'bg-destructive/10 border-destructive/20'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      {scanResult.threatLevel === 'Safe' ? (
-                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                      ) : (
-                        <AlertTriangle className={`h-6 w-6 ${scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' : 'text-destructive'}`} />
-                      )}
-                      <h3 className={`text-lg font-semibold ${
-                        scanResult.threatLevel === 'Safe' ? 'text-green-500' :
-                        scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' :
-                        'text-destructive'
-                      }`}>{scanResult.category}</h3>
-                    </div>
-                    <div className={`px-3 py-1 text-sm font-bold rounded-full ${
-                      scanResult.threatLevel === 'Safe' ? 'bg-green-500/20 text-green-500' :
-                      scanResult.threatLevel === 'Suspicious' ? 'bg-amber-500/20 text-amber-500' :
-                      'bg-destructive/20 text-destructive'
-                    }`}>
-                      {scanResult.threatScore}/100 Risk Score
-                    </div>
-                  </div>
-                  
-                  <div className="p-6 space-y-6">
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">AI Analysis</h4>
-                      <p className="text-foreground leading-relaxed">
-                        {scanResult.explanation}
-                      </p>
-                    </div>
-                    
-                    {scanResult.detectedTactics && scanResult.detectedTactics.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Detected Tactics</h4>
-                        <ul className="space-y-2">
-                          {scanResult.detectedTactics.map((flag, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                              <CheckCircle2 className={`h-4 w-4 shrink-0 mt-0.5 ${
-                                scanResult.threatLevel === 'Safe' ? 'text-green-500' :
-                                scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' :
-                                'text-destructive'
-                              }`} />
-                              {flag}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {scanResult.recommendations && scanResult.recommendations.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Recommendations</h4>
-                        <ul className="space-y-2">
-                          {scanResult.recommendations.map((rec, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                              <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                              {rec}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="bg-black/20 p-4 flex justify-end">
-                    <button 
-                      onClick={() => setScanResult(null)}
-                      className="px-6 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-foreground text-sm font-medium transition-colors"
-                    >
-                      Scan Another
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+              <ThreatCard 
+                key="result" 
+                result={scanResult} 
+                onReset={() => setScanResult(null)} 
+              />
             )}
           </AnimatePresence>
         </div>
