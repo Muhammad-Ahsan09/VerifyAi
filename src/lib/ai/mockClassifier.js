@@ -16,7 +16,8 @@ export function mockClassifier(input, type) {
     fear: ["account suspended", "locked", "unauthorized login", "temporarily restricted"],
     credentials: ["otp", "password", "mpin", "verify your identity", "login"],
     reward: ["free money", "reward", "lottery", "subsidy grant", "double yield", "cash reward"],
-    suspiciousDomains: ["http://", ".io/", ".net/form"] // simplistic check for mock
+    suspiciousDomains: ["http://", ".io/", ".net/form"],
+    fakeNews: ["secret deep state", "they don't want you to know", "miracle cure", "hidden truth", "mainstream media is lying", "shocking truth"]
   };
 
   // Check heuristics
@@ -45,6 +46,11 @@ export function mockClassifier(input, type) {
     flags.push("Contains potentially suspicious or unencrypted URLs");
   }
 
+  if (heuristics.fakeNews.some(kw => lowercaseInput.includes(kw))) {
+    score += 40;
+    flags.push("Contains conspiratorial or highly sensational language indicative of Fake News");
+  }
+
   // Determine threat level and category
   let threatLevel = "Safe";
   if (score >= 80) threatLevel = "Critical";
@@ -57,6 +63,8 @@ export function mockClassifier(input, type) {
     category = "Phishing";
   } else if (lowercaseInput.includes("grant") || lowercaseInput.includes("lottery")) {
     category = "Social Engineering";
+  } else if (heuristics.fakeNews.some(kw => lowercaseInput.includes(kw))) {
+    category = "Fake News";
   } else if (type === "url" || lowercaseInput.includes("http")) {
     category = "Malware Link";
   }
