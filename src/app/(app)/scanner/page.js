@@ -89,7 +89,7 @@ export default function ThreatScanner() {
     toast.info("Cleared input");
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!inputValue.trim() && activeTab !== "screenshot") {
       toast.error("Please provide some content to analyze.");
       return;
@@ -98,22 +98,33 @@ export default function ThreatScanner() {
     setIsScanning(true);
     setScanResult(null);
     
-    // Simulate AI scanning process
-    setTimeout(() => {
-      setIsScanning(false);
-      setScanResult({
-        threatLevel: "critical",
-        confidence: "98%",
-        type: "Phishing Attempt",
-        explanation: "This content exhibits strong urgency tactics and includes a low-reputation domain masquerading as a legitimate service. The sender attempts to manipulate you into revealing sensitive credentials.",
-        flags: [
-          "Urgency tactic detected",
-          "Unregistered or new domain",
-          "Requests sensitive information"
-        ]
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: inputValue, type: activeTab })
       });
-      toast.error("Critical threat detected!");
-    }, 4500); // 4.5 second simulated scan
+      
+      if (!res.ok) {
+        throw new Error("Failed to analyze content");
+      }
+      
+      const data = await res.json();
+      setScanResult(data);
+      
+      if (data.threatLevel === "Critical" || data.threatLevel === "High Risk") {
+        toast.error(`${data.threatLevel} threat detected!`);
+      } else if (data.threatLevel === "Suspicious") {
+        toast.warning("Suspicious content detected.");
+      } else {
+        toast.success("Content appears safe.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("An error occurred during analysis.");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   // Drag and Drop handlers
@@ -315,7 +326,7 @@ export default function ThreatScanner() {
                   <div className="flex gap-1 justify-center items-center h-4 overflow-hidden text-sm text-muted-foreground">
                     <motion.div
                       animate={{ y: ["0%", "-100%", "-200%", "-300%"] }}
-                      transition={{ duration: 4, ease: "steps(4)", repeat: Infinity }}
+                      transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
                       className="flex flex-col"
                     >
                       <span>Cross-referencing databases</span>
@@ -333,14 +344,34 @@ export default function ThreatScanner() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4 }}
               >
-                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 overflow-hidden">
-                  <div className="bg-destructive/10 px-6 py-4 flex items-center justify-between border-b border-destructive/20">
+                <div className={`rounded-2xl border overflow-hidden ${
+                  scanResult.threatLevel === 'Safe' ? 'border-green-500/30 bg-green-500/5' :
+                  scanResult.threatLevel === 'Suspicious' ? 'border-amber-500/30 bg-amber-500/5' :
+                  'border-destructive/30 bg-destructive/5'
+                }`}>
+                  <div className={`px-6 py-4 flex items-center justify-between border-b ${
+                    scanResult.threatLevel === 'Safe' ? 'bg-green-500/10 border-green-500/20' :
+                    scanResult.threatLevel === 'Suspicious' ? 'bg-amber-500/10 border-amber-500/20' :
+                    'bg-destructive/10 border-destructive/20'
+                  }`}>
                     <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-6 w-6 text-destructive" />
-                      <h3 className="text-lg font-semibold text-destructive">{scanResult.type}</h3>
+                      {scanResult.threatLevel === 'Safe' ? (
+                        <CheckCircle2 className="h-6 w-6 text-green-500" />
+                      ) : (
+                        <AlertTriangle className={`h-6 w-6 ${scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' : 'text-destructive'}`} />
+                      )}
+                      <h3 className={`text-lg font-semibold ${
+                        scanResult.threatLevel === 'Safe' ? 'text-green-500' :
+                        scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' :
+                        'text-destructive'
+                      }`}>{scanResult.category}</h3>
                     </div>
-                    <div className="px-3 py-1 bg-destructive/20 text-destructive text-sm font-bold rounded-full">
-                      {scanResult.confidence} Match
+                    <div className={`px-3 py-1 text-sm font-bold rounded-full ${
+                      scanResult.threatLevel === 'Safe' ? 'bg-green-500/20 text-green-500' :
+                      scanResult.threatLevel === 'Suspicious' ? 'bg-amber-500/20 text-amber-500' :
+                      'bg-destructive/20 text-destructive'
+                    }`}>
+                      {scanResult.threatScore}/100 Risk Score
                     </div>
                   </div>
                   
@@ -352,17 +383,37 @@ export default function ThreatScanner() {
                       </p>
                     </div>
                     
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-3">Red Flags Detected</h4>
-                      <ul className="space-y-2">
-                        {scanResult.flags.map((flag, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                            <CheckCircle2 className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                            {flag}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {scanResult.detectedTactics && scanResult.detectedTactics.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Detected Tactics</h4>
+                        <ul className="space-y-2">
+                          {scanResult.detectedTactics.map((flag, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+                              <CheckCircle2 className={`h-4 w-4 shrink-0 mt-0.5 ${
+                                scanResult.threatLevel === 'Safe' ? 'text-green-500' :
+                                scanResult.threatLevel === 'Suspicious' ? 'text-amber-500' :
+                                'text-destructive'
+                              }`} />
+                              {flag}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {scanResult.recommendations && scanResult.recommendations.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Recommendations</h4>
+                        <ul className="space-y-2">
+                          {scanResult.recommendations.map((rec, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+                              <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="bg-black/20 p-4 flex justify-end">
