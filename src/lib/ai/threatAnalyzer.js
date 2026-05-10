@@ -1,4 +1,5 @@
 import { mockClassifier } from "./mockClassifier";
+import { simulateUrlScan } from "../scanner/urlScanner";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PRIMARY_MODEL = "google/gemma-3-27b-it:free";
@@ -21,9 +22,21 @@ You must respond ONLY with a valid JSON object matching this exact schema:
   "emotionalManipulationScore": number (0-100)
 }
 
+If the user provides technical metadata (like domain age or redirects), use it to inform your summary and explanation.
 Do not include any markdown formatting like \`\`\`json. Return strictly the raw JSON object.`;
 
-async function callOpenRouter(input, type, model) {
+async function callOpenRouter(input, type, model, urlData = null) {
+  let promptContent = `Please analyze this ${type}:\n\n${input}`;
+  
+  if (urlData) {
+    promptContent += `\n\nTechnical Metadata (Use this to inform your analysis):
+- Domain: ${urlData.domain}
+- Domain Age: ${urlData.domainAgeDays} days
+- Protocol Secure: ${urlData.isSecure}
+- Registrar: ${urlData.registrarName}
+- Typosquatting Detected: ${urlData.isTyposquatting}
+- Redirect Chain: ${urlData.redirectChain.join(" -> ")}`;
+  }
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -36,7 +49,7 @@ async function callOpenRouter(input, type, model) {
       model: model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Please analyze this ${type}:\n\n${input}` }
+        { role: "user", content: promptContent }
       ],
       response_format: { type: "json_object" }
     })
@@ -56,26 +69,42 @@ async function callOpenRouter(input, type, model) {
 }
 
 export async function analyzeThreat(input, type) {
+  let urlData = null;
+  if (type === "url") {
+    urlData = simulateUrlScan(input);
+  }
+
   if (!OPENROUTER_API_KEY) {
     console.warn("OPENROUTER_API_KEY is missing. Falling back to mock classifier.");
-    return mockClassifier(input, type);
+    const res = await mockClassifier(input, type);
+    if (urlData) res.urlData = urlData;
+    return res;
   }
 
   try {
     // Try Primary Model
-    return await callOpenRouter(input, type, PRIMARY_MODEL);
+    const res = await callOpenRouter(input, type, PRIMARY_MODEL, urlData);
+    if (urlData) res.urlData = urlData;
+    res.type = type; // Ensure type is passed through
+    return res;
   } catch (error) {
     console.error(`Primary model (${PRIMARY_MODEL}) failed:`, error);
     
     try {
       // Try Fallback Model
-      return await callOpenRouter(input, type, FALLBACK_MODEL);
+      const res = await callOpenRouter(input, type, FALLBACK_MODEL, urlData);
+      if (urlData) res.urlData = urlData;
+      res.type = type;
+      return res;
     } catch (fallbackError) {
       console.error(`Fallback model (${FALLBACK_MODEL}) failed:`, fallbackError);
       
       // Ultimate Fallback to Mock Classifier
       console.warn("All AI models failed. Falling back to mock classifier.");
-      return mockClassifier(input, type);
+      const res = await mockClassifier(input, type);
+      if (urlData) res.urlData = urlData;
+      res.type = type;
+      return res;
     }
   }
 }

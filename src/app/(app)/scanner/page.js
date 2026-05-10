@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import ThreatCard from "@/components/scanner/ThreatCard";
+import UrlAnalysisCard from "@/components/scanner/UrlAnalysisCard";
 
 // --- Sample Scams Data ---
 const sampleScams = [
@@ -67,6 +68,8 @@ export default function ThreatScanner() {
   const [scanResult, setScanResult] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -74,6 +77,8 @@ export default function ThreatScanner() {
     setActiveTab(id);
     setInputValue("");
     setScanResult(null);
+    setImagePreview(null);
+    setIsExtracting(false);
   };
 
   const loadSample = (scam) => {
@@ -87,12 +92,13 @@ export default function ThreatScanner() {
   const handleClear = () => {
     setInputValue("");
     setScanResult(null);
+    setImagePreview(null);
     toast.info("Cleared input");
   };
 
   const handleAnalyze = async () => {
-    if (!inputValue.trim() && activeTab !== "screenshot") {
-      toast.error("Please provide some content to analyze.");
+    if (!inputValue.trim()) {
+      toast.error("Please provide or extract some content to analyze.");
       return;
     }
     
@@ -139,13 +145,55 @@ export default function ThreatScanner() {
     }
   };
 
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    
+    // Create preview
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
+    setInputValue("");
+    
+    // Read as Base64 for API
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = async () => {
+      const base64Image = reader.result;
+      
+      setIsExtracting(true);
+      try {
+        const res = await fetch("/api/ocr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64Image })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || "OCR Failed");
+        }
+        
+        setInputValue(data.text || "");
+        if (data.text) {
+          toast.success("Text extracted successfully!");
+        } else {
+          toast.warning("No text found in image.");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err.message || "Failed to extract text. You can type manually.");
+      } finally {
+        setIsExtracting(false);
+      }
+    };
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setInputValue(`File loaded: ${e.dataTransfer.files[0].name}`);
-      toast.success("Image loaded for analysis");
+      handleFileUpload(e.dataTransfer.files[0]);
     }
   };
 
@@ -250,37 +298,71 @@ export default function ThreatScanner() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                     />
                   </div>
-                ) : (
-                  <div 
-                    className={`relative w-full h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all ${
-                      dragActive ? "border-primary bg-primary/5" : "border-white/20 bg-white/5 hover:border-white/30 hover:bg-white/10"
-                    }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <input 
-                      type="file" 
-                      className="hidden" 
-                      ref={fileInputRef} 
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setInputValue(`File loaded: ${e.target.files[0].name}`);
-                          toast.success("Image loaded");
-                        }
-                      }} 
-                    />
-                    <UploadCloud className={`h-10 w-10 mb-4 ${dragActive ? "text-primary" : "text-muted-foreground"}`} />
-                    <p className="text-sm font-medium text-foreground">
-                      {inputValue ? inputValue : "Drag and drop your screenshot here"}
-                    </p>
-                    {!inputValue && (
-                      <p className="text-xs text-muted-foreground mt-1">or click to browse files</p>
+                ) : activeTab === "screenshot" ? (
+                  <div className="space-y-4">
+                    {!imagePreview ? (
+                      <div 
+                        className={`relative w-full h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${
+                          dragActive ? "border-primary bg-primary/5" : "border-white/20 bg-white/5 hover:border-white/30 hover:bg-white/10"
+                        }`}
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          ref={fileInputRef} 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleFileUpload(e.target.files[0]);
+                            }
+                          }} 
+                        />
+                        <UploadCloud className={`h-10 w-10 mb-4 ${dragActive ? "text-primary" : "text-muted-foreground"}`} />
+                        <p className="text-sm font-medium text-foreground">
+                          Drag and drop your screenshot here
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">or click to browse files</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="relative w-full h-48 md:h-64 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center group">
+                          <img src={imagePreview} alt="Preview" className="max-w-full max-h-full object-contain" />
+                          {isExtracting && (
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                              <RefreshCw className="h-6 w-6 text-primary animate-spin mb-3" />
+                              <span className="text-sm font-medium text-white">Extracting text...</span>
+                            </div>
+                          )}
+                          {!isExtracting && (
+                            <button 
+                              onClick={() => {
+                                setImagePreview(null);
+                                setInputValue("");
+                              }}
+                              className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white p-1.5 rounded-lg backdrop-blur-md transition-colors z-20 opacity-0 group-hover:opacity-100"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                          )}
+                        </div>
+                        <div className="w-full h-48 md:h-64 relative">
+                          <textarea
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            disabled={isExtracting}
+                            placeholder={isExtracting ? "Extracting..." : "Extracted text will appear here. You can manually edit it before analyzing."}
+                            className="w-full h-full bg-white/5 border border-white/10 rounded-xl p-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none transition-all disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
-                )}
+                ) : null}
 
                 <div className="flex items-center justify-between">
                   <button 
@@ -338,9 +420,15 @@ export default function ThreatScanner() {
                   </div>
                 </div>
               </motion.div>
+            ) : scanResult.type === "url" && scanResult.urlData ? (
+              <UrlAnalysisCard 
+                key="result-url" 
+                result={scanResult} 
+                onReset={() => setScanResult(null)} 
+              />
             ) : (
               <ThreatCard 
-                key="result" 
+                key="result-threat" 
                 result={scanResult} 
                 onReset={() => setScanResult(null)} 
               />
